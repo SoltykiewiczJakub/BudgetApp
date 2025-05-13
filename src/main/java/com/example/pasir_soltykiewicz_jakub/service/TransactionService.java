@@ -1,5 +1,6 @@
 package com.example.pasir_soltykiewicz_jakub.service;
 
+import com.example.pasir_soltykiewicz_jakub.dto.BalanceDTO;
 import com.example.pasir_soltykiewicz_jakub.model.TransactionType;
 import com.example.pasir_soltykiewicz_jakub.model.User;
 import com.example.pasir_soltykiewicz_jakub.repository.UserRepository;
@@ -10,6 +11,7 @@ import com.example.pasir_soltykiewicz_jakub.repository.TransactionRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -22,7 +24,7 @@ public class TransactionService {
         this.userRepository = userRepository;
     }
 
-    private User getCurrentUser() {
+    public User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Nie znaleziono zalogowanego użytkownika"));
@@ -30,7 +32,7 @@ public class TransactionService {
 
     public List<Transaction> getAllTransactions() {
         User user = getCurrentUser();
-        return transactionRepository.findAllByUser(user);
+        return transactionRepository.findByUser(user);
     }
 
     public Transaction getTransactionById(Long id) {
@@ -44,6 +46,7 @@ public class TransactionService {
         transaction.setTags(transactionDTO.getTags());
         transaction.setNotes(transactionDTO.getNotes());
         transaction.setUser(getCurrentUser());
+        transaction.setTimestamp(LocalDateTime.now());
         return transactionRepository.save(transaction);
     }
 
@@ -65,11 +68,36 @@ public class TransactionService {
     }
 
 
-    public void deleteTransaction(Long id) {
+    public Transaction deleteTransaction(Long id) {
         if (!transactionRepository.existsById(id)) {
             throw new EntityNotFoundException("Nie znaleziono transakcji o ID " + id);
         }
         transactionRepository.deleteById(id);
+
+        return null;
+    }
+
+    public BalanceDTO getUserBalance(User user, Float days) {
+        List<Transaction> userTransactions = transactionRepository.findByUser((user));
+
+        if (days != null) {
+            LocalDateTime fromDate = LocalDateTime.now().minusSeconds(Math.round(days * 86400));
+            userTransactions = userTransactions.stream()
+                    .filter(t -> t.getTimestamp().isAfter(fromDate))
+                    .toList();
+        }
+
+        double income = userTransactions.stream()
+                .filter(t -> t.getType() == TransactionType.INCOME)
+                .mapToDouble(Transaction::getAmount)
+                .sum();
+
+        double expense = userTransactions.stream()
+                .filter(t -> t.getType() == TransactionType.EXPENSE)
+                .mapToDouble(Transaction::getAmount)
+                .sum();
+
+        return new BalanceDTO(income, expense, income - expense);
     }
 }
 

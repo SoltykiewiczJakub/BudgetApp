@@ -40,7 +40,7 @@ public class UserService implements UserDetailsService {
         if (!encoder.matches(dto.getPassword(), user.getPassword())) {
             throw new BadCredentialsException("Nieprawidłowe dane logowania");
         }
-        return jwtUtil.generateToken(user.getEmail());
+        return jwtUtil.generateToken(user);
     }
 
     @Override
